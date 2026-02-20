@@ -1,0 +1,63 @@
+name: Build and Publish CTF Environment
+
+on:
+  push:
+    branches:
+    paths:
+      - 'Dockerfile'
+  # 🔥 OPTIMIZACIÓN 1: Permite ejecutar el workflow manualmente desde la web de GitHub
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    
+    # Permisos necesarios para poder escribir la imagen en los paquetes de tu cuenta
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 🔥 OPTIMIZACIÓN 2: Instalar Docker Buildx (Motor moderno de Docker necesario para la caché)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 🔥 OPTIMIZACIÓN 3: GHCR odia las mayúsculas. Esto convierte "Usuario/Repo" a "usuario/repo"
+      - name: Lowercase the image name
+        run: echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '' '')" >> $GITHUB_ENV
+
+      # 🔥 OPTIMIZACIÓN 4: Extrae etiquetas inteligentemente (le pone "latest" y el hash del commit)
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      # 🔥 OPTIMIZACIÓN 5: Build y Push con Caché de GitHub Actions
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Esto guarda las capas de Docker en la caché de GitHub. 
+          # Hará que tus builds pasen de tardar 5-10 minutos a solo segundos.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
