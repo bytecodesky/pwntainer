@@ -33,8 +33,17 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libffi-dev \
     bsdmainutils \
+    libc6-dbg \
+    glibc-source \
+    qemu-user \
+    qemu-user-static \
+    gcc-aarch64-linux-gnu \
+    gcc-arm-linux-gnueabihf \
+    libc6-arm64-cross \
+    libc6-armhf-cross \
     && rm -rf /var/lib/apt/lists/*
 
+RUN cd /usr/src/glibc && tar -xvf glibc-*.tar.xz || true
 # 2. Instalar herramientas de Python (Pwntools, Ropper, ROPgadget)
 # Usamos --no-cache-dir para que la imagen pese menos
 RUN pip3 install --no-cache-dir --upgrade pip && \
@@ -54,6 +63,9 @@ RUN git clone https://github.com/pwndbg/pwndbg /opt/pwndbg && \
 # Descarga el binario precompilado y le da permisos de ejecución
 RUN wget -O /usr/local/bin/pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit && \
     chmod +x /usr/local/bin/pwninit
+
+RUN echo "[context]\nterminal=['tmux', 'splitw', '-h']" > /root/.pwn.conf && \
+    echo "set-option -g mouse on\nset -g default-terminal \"xterm-256color\"" > /root/.tmux.conf
 
 # 6. Directorio de trabajo
 # Al mapear el volumen desde Rust, todo caerá en esta carpeta
